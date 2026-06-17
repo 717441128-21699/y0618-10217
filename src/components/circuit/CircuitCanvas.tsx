@@ -42,6 +42,19 @@ export function CircuitCanvas({ onDrop }: CircuitCanvasProps) {
     { isOver: boolean; canDrop: boolean }
   >({
     accept: [DND_TYPES.GATE, DND_TYPES.GATE_INSTANCE],
+    canDrop: (item) => {
+      if (item.type === DND_TYPES.GATE) {
+        const info = getGateInfo(item.gateType as GateType);
+        if (!info) return false;
+        return info.qubitCount <= qubitCount;
+      }
+      if (item.type === DND_TYPES.GATE_INSTANCE) {
+        const gate = gates.find((g) => g.id === item.gateId);
+        if (!gate) return false;
+        return gate.targetQubits.length <= qubitCount;
+      }
+      return false;
+    },
     drop: (item, monitor) => {
       const offset = monitor.getClientOffset();
       const svgEl = svgRef.current;
@@ -60,6 +73,8 @@ export function CircuitCanvas({ onDrop }: CircuitCanvasProps) {
         if (!info) return;
 
         const qubitsNeeded = info.qubitCount;
+        if (qubitsNeeded > qubitCount) return;
+
         const startQubit = Math.min(qubit, qubitCount - qubitsNeeded);
         const targets: number[] = [];
         for (let i = 0; i < qubitsNeeded; i++) targets.push(startQubit + i);
@@ -76,6 +91,8 @@ export function CircuitCanvas({ onDrop }: CircuitCanvasProps) {
         const gate = gates.find((g) => g.id === item.gateId);
         if (!gate) return;
         const qubitsNeeded = gate.targetQubits.length;
+        if (qubitsNeeded > qubitCount) return;
+
         const startQubit = Math.min(qubit, qubitCount - qubitsNeeded);
         const targets: number[] = [];
         for (let i = 0; i < qubitsNeeded; i++) targets.push(startQubit + i);

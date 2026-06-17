@@ -11,6 +11,7 @@ import {
   createInitialState,
   getSingleQubitMatrix,
   I_MATRIX,
+  Y_MATRIX,
   type GateMatrix,
 } from './gates';
 
@@ -87,32 +88,38 @@ export function applyCNOT(
   return next;
 }
 
+export function applyControlledSingleQubitGate(
+  state: Complex[],
+  qubitCount: number,
+  control: number,
+  target: number,
+  matrix: GateMatrix
+): Complex[] {
+  const n = numState(qubitCount);
+  const next: Complex[] = new Array(n);
+  for (let i = 0; i < n; i++) next[i] = { ...cZero };
+
+  for (let i = 0; i < n; i++) {
+    if (bitAt(i, control) === 0) {
+      next[i] = cAdd(next[i], state[i]);
+    } else {
+      const t = bitAt(i, target);
+      const j0 = setBit(i, target, 0);
+      const j1 = setBit(i, target, 1);
+      next[j0] = cAdd(next[j0], cMul(matrix[0][t], state[i]));
+      next[j1] = cAdd(next[j1], cMul(matrix[1][t], state[i]));
+    }
+  }
+  return next;
+}
+
 export function applyCY(
   state: Complex[],
   qubitCount: number,
   control: number,
   target: number
 ): Complex[] {
-  const n = numState(qubitCount);
-  const next: Complex[] = cArrCopy(state);
-  for (let i = 0; i < n; i++) {
-    if (bitAt(i, control) === 1) {
-      const origBit = bitAt(i, target);
-      if (origBit === 0) {
-        const j = setBit(i, target, 1);
-        next[i] = cAdd(next[i], cZero);
-        next[j] = cAdd(next[j], cMul({ re: 0, im: 1 }, state[i]));
-        next[i] = { re: 0, im: 0 };
-      } else {
-        const j = setBit(i, target, 0);
-        if (i > j) continue;
-        const tmp = next[i];
-        next[i] = cMul({ re: 0, im: -1 }, next[j]);
-        next[j] = tmp;
-      }
-    }
-  }
-  return next;
+  return applyControlledSingleQubitGate(state, qubitCount, control, target, Y_MATRIX);
 }
 
 export function applyCZ(

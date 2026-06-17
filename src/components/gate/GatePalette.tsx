@@ -2,6 +2,7 @@ import { GATE_INFO_LIST } from '../../engine/gates';
 import type { GateCategory, GateInfo } from '../../types/quantum';
 import { GateCard } from './GateCard';
 import { useState } from 'react';
+import { useCircuitStore } from '../../store/circuitStore';
 
 const categoryLabels: Record<GateCategory | 'all', string> = {
   all: '全部',
@@ -16,6 +17,7 @@ const categoryOrder: (GateCategory | 'all')[] = ['all', 'single', 'rotation', 'c
 
 export function GatePalette() {
   const [activeCat, setActiveCat] = useState<GateCategory | 'all'>('all');
+  const qubitCount = useCircuitStore((s) => s.qubitCount);
 
   const filtered: GateInfo[] = activeCat === 'all'
     ? GATE_INFO_LIST
@@ -41,7 +43,12 @@ export function GatePalette() {
 
       <div className="grid grid-cols-1 gap-2 mt-1">
         {filtered.map((gate) => (
-          <GateCard key={gate.type} gate={gate} />
+          <GateCard
+            key={gate.type}
+            gate={gate}
+            disabled={gate.qubitCount > qubitCount}
+            currentQubitCount={qubitCount}
+          />
         ))}
       </div>
 
@@ -49,7 +56,7 @@ export function GatePalette() {
         <p className="text-[11px] text-slate-400 leading-relaxed">
           <span className="font-semibold text-cyan-300">提示：</span>
           将左侧量子门拖拽到中间画布的量子比特线路上。
-          受控门需跨越多条线路（可通过按住拖动来放置）。
+          受控门需跨越多条线路（可通过按住拖动来放置）。门所需比特数超过当前量子比特数时会禁用（灰显），请先增加量子比特数。
         </p>
       </div>
     </div>

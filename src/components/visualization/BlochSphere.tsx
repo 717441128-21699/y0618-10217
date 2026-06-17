@@ -11,36 +11,61 @@ interface BlochSphereInnerProps {
   autoRotate?: boolean;
 }
 
-function slerp(a: THREE.Vector3, b: THREE.Vector3, t: number): THREE.Vector3 {
-  const dot = Math.max(-1, Math.min(1, a.dot(b)));
-  if (dot > 0.9995) return a.clone().lerp(b, t).normalize();
-  const theta = Math.acos(dot) * t;
-  const rel = b.clone().sub(a.clone().multiplyScalar(dot)).normalize();
-  return a.clone().multiplyScalar(Math.cos(theta)).add(rel.multiplyScalar(Math.sin(theta)));
+interface BlochArrowProps {
+  direction: THREE.Vector3;
+  length: number;
+  visible: boolean;
 }
 
-function BlochArrow({ target }: { target: THREE.Vector3 }) {
+function BlochArrow({ direction, length, visible }: BlochArrowProps) {
   const ref = useRef<THREE.Group>(null);
-  const current = useRef(new THREE.Vector3(0, 0, 1));
   const tipRef = useRef<THREE.Mesh>(null);
+  const currentDir = useRef(new THREE.Vector3(0, 0, 1));
+  const currentLen = useRef(1);
 
   useFrame((_, delta) => {
     if (!ref.current) return;
-    const t = Math.min(1, delta * 4);
-    const next = slerp(current.current, target, t);
-    current.current.copy(next);
-    const len = next.length();
-    ref.current.scale.set(1, len, 1);
-    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), next.clone().normalize());
+    const t = Math.min(1, delta * 5);
+
+    const dirLen = direction.length();
+    const targetDir: THREE.Vector3 =
+      dirLen < 1e-6
+        ? currentDir.current.clone().normalize()
+        : direction.clone().normalize();
+
+    const dot = Math.max(-1, Math.min(1, currentDir.current.dot(targetDir)));
+    let nextDir: THREE.Vector3;
+    if (dot > 0.9995) {
+      nextDir = currentDir.current.clone().lerp(targetDir, t).normalize();
+    } else {
+      const theta = Math.acos(dot) * t;
+      const rel = targetDir
+        .clone()
+        .sub(currentDir.current.clone().multiplyScalar(dot))
+        .normalize();
+      nextDir = currentDir.current
+        .clone()
+        .multiplyScalar(Math.cos(theta))
+        .add(rel.multiplyScalar(Math.sin(theta)));
+    }
+    currentDir.current.copy(nextDir);
+
+    const nextLen = currentLen.current + (length - currentLen.current) * t;
+    currentLen.current = nextLen;
+
+    ref.current.scale.set(1, Math.max(0.0001, nextLen), 1);
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      nextDir
+    );
     ref.current.quaternion.copy(q);
     if (tipRef.current) {
-      tipRef.current.position.copy(next);
+      tipRef.current.position.copy(nextDir.clone().multiplyScalar(nextLen));
     }
   });
 
-  const dir = current.current.clone().normalize();
   return (
-    <group>
+    <group visible={visible}>
       <group ref={ref}>
         <mesh position={[0, 0.5, 0]}>
           <cylinderGeometry args={[0.02, 0.02, 1, 8]} />
@@ -51,14 +76,23 @@ function BlochArrow({ target }: { target: THREE.Vector3 }) {
         <sphereGeometry args={[0.055, 16, 16]} />
         <meshStandardMaterial color="#f97316" emissive="#ea580c" emissiveIntensity={1.2} />
       </mesh>
-      <Line
-        points={[new THREE.Vector3(0, 0, 0), new THREE.Vector3(dir.x * 0.3, dir.y * 0.3, dir.z * 0.3)]}
-        color="#f97316"
-        lineWidth={3}
-        transparent
-        opacity={0.3}
-      />
     </group>
+  );
+}
+
+function MixedStateCloud({ visible }: { visible: boolean }) {
+  return (
+    <mesh visible={visible} position={[0, 0, 0]}>
+      <sphereGeometry args={[0.14, 20, 20]} />
+      <meshStandardMaterial
+        color="#94a3b8"
+        transparent
+        opacity={0.45}
+        emissive="#64748b"
+        emissiveIntensity={0.4}
+        roughness={0.4}
+      />
+    </mesh>
   );
 }
 
@@ -123,10 +157,12 @@ function MeridianRings() {
 
 function BlochScene({ coords, showTooltip = true, autoRotate = true }: BlochSphereInnerProps) {
   const controlsRef = useRef<any>(null);
-  const target = useMemo(
-    () => new THREE.Vector3(coords.x, coords.z, coords.y),
-    [coords.x, coords.y, coords.z]
-  );
+  const isMixed = coords.length < 0.05;
+  const direction = useMemo(() => {
+    const d = new THREE.Vector3(coords.x, coords.z, coords.y);
+    return d.lengthSq() > 1e-8 ? d.normalize() : new THREE.Vector3(0, 1, 0);
+  }, [coords.x, coords.y, coords.z]);
+  const length = coords.length;
 
   useFrame(() => {
     if (autoRotate && controlsRef.current && !controlsRef.current?.isDragging) {
@@ -164,7 +200,8 @@ function BlochScene({ coords, showTooltip = true, autoRotate = true }: BlochSphe
       <Axis dir={[0, 1.05, 0]} color="#3b82f6" label="z |0⟩" labelPos={[0, 1.2, 0]} />
       <Axis dir={[0, -1.05, 0]} color="#6366f1" label="|1⟩" labelPos={[0, -1.22, 0]} />
 
-      <BlochArrow target={target} />
+      <BlochArrow direction={direction} length={length} visible={!isMixed} />
+      <MixedStateCloud visible={isMixed} />
 
       <mesh position={[0, 0, 0]}>
         <sphereGeometry args={[0.025, 8, 8]} />
@@ -172,17 +209,31 @@ function BlochScene({ coords, showTooltip = true, autoRotate = true }: BlochSphe
       </mesh>
 
       {showTooltip && (
-        <Html position={[target.x * 1.18, target.z * 1.18 + 0.1, target.y * 1.18]} center distanceFactor={5}>
+        <Html
+          position={[
+            direction.x * (isMixed ? 0.2 : 1.18),
+            direction.z * (isMixed ? 0.2 : 1.18) + 0.1,
+            direction.y * (isMixed ? 0.2 : 1.18),
+          ]}
+          center
+          distanceFactor={5}
+        >
           <div
             className="text-[9px] font-mono px-2 py-1 rounded-lg pointer-events-none whitespace-nowrap"
             style={{
               background: 'rgba(15,23,42,0.9)',
-              border: '1px solid rgba(249,115,22,0.5)',
-              color: '#fdba74',
-              boxShadow: '0 0 16px rgba(249,115,22,0.2)',
+              border: isMixed
+                ? '1px solid rgba(148,163,184,0.5)'
+                : '1px solid rgba(249,115,22,0.5)',
+              color: isMixed ? '#cbd5e1' : '#fdba74',
+              boxShadow: isMixed
+                ? '0 0 16px rgba(148,163,184,0.2)'
+                : '0 0 16px rgba(249,115,22,0.2)',
             }}
           >
-            θ={radToDeg(coords.theta).toFixed(0)}° φ={radToDeg(coords.phi).toFixed(0)}°
+            {isMixed
+              ? '最大混合态 |r|=0'
+              : `θ=${radToDeg(coords.theta).toFixed(0)}° φ=${radToDeg(coords.phi).toFixed(0)}° |r|=${length.toFixed(2)}`}
           </div>
         </Html>
       )}

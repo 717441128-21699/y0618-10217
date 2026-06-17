@@ -26,12 +26,14 @@ export function ProbabilityHistogram() {
   }, [probabilities, N]);
 
   const data = useMemo(() => {
+    const all = display.map((p, idx) => ({ index: idx, probability: p }));
+    const filteredByZero = all.filter((x) => showZero || x.probability > 1e-10);
     if (sortByProb) {
       return sortStatesByProbability(
-        display.map((p) => ({ re: Math.sqrt(p), im: 0 }))
+        filteredByZero.map((x) => ({ re: Math.sqrt(x.probability), im: 0 }))
       ).map((s) => ({ index: s.index, probability: s.probability }));
     }
-    return display.map((p, idx) => ({ index: idx, probability: p })).filter((x) => showZero || x.probability > 1e-10);
+    return filteredByZero;
   }, [display, sortByProb, showZero]);
 
   const maxP = Math.max(0.01, ...data.map((d) => d.probability));

@@ -7,12 +7,15 @@ import clsx from 'clsx';
 interface GateCardProps {
   gate: GateInfo;
   compact?: boolean;
+  disabled?: boolean;
+  currentQubitCount?: number;
 }
 
-export function GateCard({ gate, compact = false }: GateCardProps) {
+export function GateCard({ gate, compact = false, disabled = false, currentQubitCount }: GateCardProps) {
   const color = gateColor(gate.type);
   const [{ isDragging }, drag] = useDrag<DragGateItem, unknown, { isDragging: boolean }>(() => ({
     type: DND_TYPES.GATE,
+    canDrag: !disabled,
     item: {
       type: DND_TYPES.GATE,
       gateType: gate.type,
@@ -22,17 +25,23 @@ export function GateCard({ gate, compact = false }: GateCardProps) {
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-  }), [gate]);
+  }), [gate, disabled]);
+
+  const title = disabled
+    ? `${gate.description}\n⚠ 需要 ${gate.qubitCount} 个量子比特，当前仅 ${currentQubitCount} 个，请增加量子比特数`
+    : gate.description;
 
   return (
     <div
       ref={drag}
-      title={gate.description}
+      title={title}
       className={clsx(
-        'relative group cursor-grab active:cursor-grabbing select-none transition-all duration-200',
+        'relative group select-none transition-all duration-200',
         compact ? 'p-1.5 rounded-lg' : 'p-2 rounded-xl',
-        'bg-slate-800/60 border border-white/10 hover:border-white/30 hover:bg-slate-800/90',
-        isDragging ? 'opacity-40 scale-95' : 'opacity-100 hover:-translate-y-0.5 hover:shadow-lg'
+        disabled
+          ? 'cursor-not-allowed bg-slate-900/60 border border-white/5 opacity-40 grayscale'
+          : 'cursor-grab active:cursor-grabbing bg-slate-800/60 border border-white/10 hover:border-white/30 hover:bg-slate-800/90 hover:-translate-y-0.5 hover:shadow-lg',
+        isDragging ? 'opacity-40 scale-95' : 'opacity-100'
       )}
       style={{
         boxShadow: isDragging ? 'none' : undefined,
@@ -55,8 +64,11 @@ export function GateCard({ gate, compact = false }: GateCardProps) {
         {!compact && (
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-slate-100 truncate">{gate.label}</div>
-            <div className="text-[10px] text-slate-400 truncate">
-              {gate.qubitCount}比特 · {gate.category}
+            <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+              <span>{gate.qubitCount}比特 · {gate.category}</span>
+              {disabled && (
+                <span className="text-amber-400/90 font-bold">· 需≥{gate.qubitCount}Q</span>
+              )}
             </div>
           </div>
         )}

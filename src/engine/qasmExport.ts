@@ -66,13 +66,19 @@ export function circuitToQasm(
   }
 
   lines.push(`qreg q[${qubitCount}];`);
-  const hasMeasure = gates.some((g) => g.type === 'Measure');
+
+  const validGates = gates.filter((g) =>
+    g.targetQubits.length > 0 &&
+    g.targetQubits.every((q) => q >= 0 && q < qubitCount)
+  );
+
+  const hasMeasure = validGates.some((g) => g.type === 'Measure');
   if (hasMeasure || includeMeasurement) {
     lines.push(`creg c[${qubitCount}];`);
   }
   lines.push('');
 
-  const sorted = [...gates].sort((a, b) => {
+  const sorted = [...validGates].sort((a, b) => {
     if (a.column !== b.column) return a.column - b.column;
     return a.targetQubits[0] - b.targetQubits[0];
   });

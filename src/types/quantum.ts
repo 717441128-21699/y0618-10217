@@ -38,6 +38,7 @@ export interface BlochCoords {
   z: number;
   theta: number;
   phi: number;
+  length: number;
 }
 
 export interface ExampleCircuit {

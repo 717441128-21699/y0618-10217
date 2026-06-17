@@ -8,7 +8,7 @@ import type { BlochCoords, Complex } from '../../types/quantum';
 import { Eye, EyeOff } from 'lucide-react';
 import { GlowButton } from '../common/GlowButton';
 
-const ZERO_COORDS: BlochCoords = { x: 0, y: 0, z: 1, theta: 0, phi: 0 };
+const ZERO_COORDS: BlochCoords = { x: 0, y: 0, z: 1, theta: 0, phi: 0, length: 1 };
 
 export function BlochSphereGrid() {
   const qubitCount = useCircuitStore((s) => s.qubitCount);
@@ -34,6 +34,7 @@ export function BlochSphereGrid() {
         z: Math.cos(s.theta),
         theta: s.theta,
         phi: s.phi,
+        length: 1,
       };
     });
   }, [currentState, qubitCount, initialStates, hasSimulated]);

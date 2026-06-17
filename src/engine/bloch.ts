@@ -31,9 +31,15 @@ export function partialTrace(state: Complex[], qubitCount: number, target: numbe
 export function densityToBloch(rho: Complex[][]): BlochCoords {
   const rx = 2 * rho[0][1].re;
   const ry = 2 * rho[0][1].im;
-  const rz = (rho[0][0].re - rho[1][1].re);
+  const rz = rho[0][0].re - rho[1][1].re;
 
-  const r = Math.sqrt(rx * rx + ry * ry + rz * rz) || 1;
+  const r = Math.sqrt(rx * rx + ry * ry + rz * rz);
+  const length = Math.min(1, Math.max(0, r));
+
+  if (r < 1e-9) {
+    return { x: 0, y: 0, z: 0, theta: 0, phi: 0, length: 0 };
+  }
+
   const nx = rx / r;
   const ny = ry / r;
   const nz = Math.max(-1, Math.min(1, rz / r));
@@ -42,7 +48,7 @@ export function densityToBloch(rho: Complex[][]): BlochCoords {
   let phi = Math.atan2(ny, nx);
   if (phi < 0) phi += 2 * Math.PI;
 
-  return { x: nx, y: ny, z: nz, theta, phi };
+  return { x: nx, y: ny, z: nz, theta, phi, length };
 }
 
 export function stateToSingleQubitBloch(
